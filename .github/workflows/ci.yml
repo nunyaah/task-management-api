@@ -1,0 +1,91 @@
+name: CI
+
+# Run on every push to any branch, and on PRs targeting main.
+# This means you get CI feedback on feature branches before opening a PR.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ── Job 1: Lint ─────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run linter
+        # ruff check . exits with a non-zero code if there are any lint errors.
+        # A non-zero exit code fails the step, which fails the job.
+        run: ruff check .
+
+  # ── Job 2: Test ─────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint  # Only runs if the lint job passes — fail fast
+
+    # Spin up a real PostgreSQL alongside the test runner.
+    # Our tests use SQLite via dependency_overrides, but DATABASE_URL is set
+    # here so database.py can import without errors at module load time.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          # Injected so database.py can create its engine without crashing on import.
+          # The tests themselves override get_db with SQLite, so this PostgreSQL
+          # URL is never actually used to open a connection during testing.
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+          # auth.py reads SECRET_KEY from the environment for token signing.
+          # We use a fixed test value here (not a real secret — it's in the workflow file,
+          # not in secrets, because test tokens have no security value).
+          SECRET_KEY: ci-test-secret-key-not-for-production
+        run: pytest --tb=short -q
+
+  # ── Job 3: Build ─────────────────────────────────────────────────────────────
+  build:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: test  # Only runs if tests pass
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        # Tag with the commit SHA so each build is uniquely identified.
+        # In a real deployment pipeline, you'd push this image to a registry here.
+        run: docker build -t task-management-api:${{ github.sha }} .

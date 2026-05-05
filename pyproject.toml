@@ -1,0 +1,15 @@
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+# E = pycodestyle style errors
+# F = pyflakes (unused imports, undefined names)
+# I = isort (import ordering)
+select = ["E", "F", "I"]
+# E501 = line too long — we handle line length with line-length above, not as an error
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+# Run tests from the project root so imports resolve correctly
+testpaths = ["tests"]

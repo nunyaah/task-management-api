@@ -1,0 +1,43 @@
+services:
+
+  # ── PostgreSQL database ────────────────────────────────────────────────────
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: taskdb
+    volumes:
+      # Named volume: data persists across 'docker compose down' and restarts.
+      # Without this, the database is wiped every time the container is removed.
+      - pgdata:/var/lib/postgresql/data
+      # init.sql runs automatically on first container start (when pgdata is empty).
+      # PostgreSQL looks for *.sql files in this directory and executes them in order.
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      # pg_isready exits 0 when PostgreSQL is accepting connections, non-zero otherwise.
+      # Docker uses this to determine if the container is 'healthy'.
+      test: ["CMD-SHELL", "pg_isready -U appuser -d taskdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI application ────────────────────────────────────────────────────
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      # .env is NOT committed to git. It contains the real secrets.
+      # Docker Compose loads it and injects each line as an environment variable.
+      - .env
+    depends_on:
+      db:
+        # 'service_healthy' waits for the healthcheck above to pass before
+        # starting the API. Without this, the API starts while PostgreSQL is
+        # still initialising and crashes immediately on the first DB query.
+        condition: service_healthy
+
+# Named volumes must be declared here so Docker Compose manages their lifecycle.
+volumes:
+  pgdata:
