@@ -11,7 +11,14 @@ HTTP routing belongs in routers/, not here.
 This file is just the wiring.
 """
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
+
+# Load variables from .env into the process environment.
+# Must happen before any other import that reads os.getenv() — so it goes first.
+# In Docker Compose, environment variables are already injected by the runtime,
+# so load_dotenv() finds nothing new and is harmless there.
+load_dotenv()
 
 from routers import auth, tasks, teams
 
