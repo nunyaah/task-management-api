@@ -74,6 +74,17 @@ def get_team(db: Session, team_id: int) -> Team:
     return team
 
 
+def get_user_teams(db: Session, user_id: int) -> list[Team]:
+    """Return all teams the given user is a member of."""
+    return (
+        db.query(Team)
+        .join(TeamMember, TeamMember.team_id == Team.id)
+        .options(joinedload(Team.members).joinedload(TeamMember.user))
+        .filter(TeamMember.user_id == user_id)
+        .all()
+    )
+
+
 def _load_team_with_members(db: Session, team_id: int):
     """
     Load a team and eagerly fetch members + their user details in one query.

@@ -1,140 +1,211 @@
-## What you're building
+# Task Management API
 
-A **task management API** for teams. Teams have members. Members create tasks. Tasks are assigned to members.
-
----
-
-## Domain rules
-
-- A **user** has a name, email, and password
-- A **team** has a name and a creator (a user)
-- A user can belong to **multiple teams** (many-to-many)
-- A **task** belongs to a team, has a title, description, status (`todo` / `in_progress` / `done`), and an optional assignee (a user who is a member of that team)
-- Only a **team member** can create tasks in that team
-- Only the **task creator or the assignee** can update a task
-- Assigning a task to someone who is **not a team member** must be rejected with 400
+A team task management application built with FastAPI, PostgreSQL, and Next.js. Users register, form teams, and manage tasks with role-based access control.
 
 ---
 
-## Schema requirements
+## What it does
 
-Write raw SQL (`init.sql`) and SQLAlchemy models (`models.py`):
-
-- Correct normalization — no redundancy
-- All foreign keys indexed manually
-- Right `ON DELETE` behavior on every FK — justify each in a comment
-- `CHECK` constraint on task status — only the three valid values allowed
-- `created_at` and `updated_at` on tasks — `updated_at` must update automatically on change
-
----
-
-## Endpoints to implement
-
-**Auth**
-| Method | Path | Rule |
-|---|---|---|
-| `POST` | `/auth/register` | Hash password, return user (no password in response) |
-| `POST` | `/auth/login` | Return JWT token |
-
-**Teams**
-| Method | Path | Rule |
-|---|---|---|
-| `POST` | `/teams` | Auth required. Creator is auto-added as first member |
-| `POST` | `/teams/{team_id}/members` | Auth required. Only existing team members can add new members |
-| `GET` | `/teams/{team_id}` | Auth required. Returns team + member list |
-
-**Tasks**
-| Method | Path | Rule |
-|---|---|---|
-| `POST` | `/teams/{team_id}/tasks` | Auth required. Must be team member |
-| `GET` | `/teams/{team_id}/tasks` | Auth required. Must be team member. Supports `?status=` filter and `?assignee_id=` filter |
-| `PATCH` | `/tasks/{task_id}` | Auth required. Only creator or assignee can update |
-| `DELETE` | `/tasks/{task_id}` | Auth required. Only creator can delete |
+- Users register and log in with JWT authentication
+- A user creates a team and is automatically added as its first member
+- Team members can add other users and create tasks
+- Tasks have a status (`todo` / `in_progress` / `done`) and an optional assignee
+- Only the task creator or assignee can update a task; only the creator can delete it
+- Assigning a task to someone outside the team is rejected
 
 ---
 
-## Technical requirements
+## Tech stack
 
-**Project structure — non-negotiable:**
+| Layer | Technology |
+|---|---|
+| API | FastAPI + SQLAlchemy |
+| Database | PostgreSQL 15 |
+| Auth | JWT (python-jose) + bcrypt (passlib) |
+| Frontend | Next.js 14 + Tailwind CSS |
+| Containerisation | Docker (multi-stage) + Docker Compose |
+| CI | GitHub Actions (lint → test → build) |
+| Tests | pytest + SQLite via `dependency_overrides` |
+
+---
+
+## Project structure
+
 ```
-├── main.py
-├── database.py
-├── models.py
-├── schemas.py
-├── auth.py
-├── dependencies.py        # get_db, get_current_user, get_team_member
+├── main.py               # App entry point, CORS, router registration
+├── database.py           # SQLAlchemy engine + get_db dependency
+├── models.py             # ORM models (User, Team, TeamMember, Task)
+├── schemas.py            # Pydantic request/response schemas
+├── auth.py               # Password hashing + JWT encode/decode
+├── dependencies.py       # get_current_user, get_team_member dependency chain
 ├── routers/
-│   ├── auth.py
-│   ├── teams.py
-│   └── tasks.py
+│   ├── auth.py           # POST /auth/register, POST /auth/login, GET /auth/me
+│   ├── teams.py          # GET /teams, POST /teams, POST /teams/{id}/members, GET /teams/{id}
+│   └── tasks.py          # POST /teams/{id}/tasks, GET /teams/{id}/tasks, PATCH /tasks/{id}, DELETE /tasks/{id}
 ├── services/
-│   ├── teams.py           # business logic — not in route functions
-│   └── tasks.py
+│   ├── auth.py           # Registration and login logic
+│   ├── teams.py          # Team creation, membership, queries
+│   └── tasks.py          # Task CRUD + ownership checks
 ├── tests/
-│   └── test_api.py
-├── init.sql
-├── Dockerfile             # multi-stage
-├── docker-compose.yml     # api + postgres with healthcheck
-├── .github/
-│   └── workflows/
-│       └── ci.yml         # lint → test → build
-├── .gitignore
-├── .env                   # not committed
-├── pyproject.toml         # ruff config
+│   └── test_api.py       # 8 integration tests using SQLite
+├── frontend/
+│   ├── app/              # Next.js App Router pages
+│   │   ├── login/        # Login page
+│   │   ├── register/     # Registration page
+│   │   ├── dashboard/    # Teams overview
+│   │   └── teams/[teamId]/ # Team detail: tasks + members
+│   ├── lib/api.ts        # Typed fetch wrapper for all API calls
+│   ├── types/index.ts    # TypeScript interfaces matching backend schemas
+│   └── Dockerfile        # Multi-stage Next.js production build
+├── init.sql              # PostgreSQL schema (tables, indexes, trigger)
+├── Dockerfile            # Multi-stage Python production build
+├── docker-compose.yml    # db + api + frontend, with healthchecks
+├── .github/workflows/
+│   └── ci.yml            # lint → test → build pipeline
+├── pyproject.toml        # ruff linter config
 └── requirements.txt
 ```
 
-**Non-negotiables:**
-- Every route has a `response_model`
-- `get_db` uses `yield` with commit / rollback / close
-- No business logic inside route functions — it lives in `services/`
-- `SECRET_KEY` and `DATABASE_URL` come from environment variables only
-- Multi-stage Dockerfile with non-root user
-- `depends_on: condition: service_healthy` in Compose
-- Service name (`db`) in `DATABASE_URL`, not `localhost`
-
 ---
 
-## Tests to write
+## Running with Docker (recommended)
 
-All using `dependency_overrides` + SQLite:
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-1. Register a user → 201, no password in response
-2. Login → returns a token
-3. Create a team → 201, creator is in the member list
-4. Add a member to a team as a non-member → 403
-5. Create a task as a non-member → 403
-6. Assign a task to a non-member → 400
-7. Update a task as someone who is neither creator nor assignee → 403
-8. Filter tasks by status → only correct tasks returned
+```bash
+docker compose up --build
+```
 
----
-
-## CI pipeline requirements
-
-Three jobs, each `needs` the previous:
-
-1. **lint** — `ruff check .` fails the pipeline on any error
-2. **test** — `pytest` with a real PostgreSQL service container
-3. **build** — `docker build` succeeds
-
----
-
-## What I'll assess
-
-| Area | What I'm looking for |
+| Service | URL |
 |---|---|
-| Schema | Normalization, indexes, constraints, ON DELETE justification |
-| Services layer | Business logic is not in route functions |
-| Dependency chain | `get_team_member` built on `get_current_user` built on `get_db` |
-| Auth | Password hashed, JWT verified, ownership correctly checked |
-| Error codes | 400 / 401 / 403 / 404 used correctly and consistently |
-| Tests | All 8 cases, `dependency_overrides`, no real DB in tests |
-| Docker | Multi-stage, non-root, healthcheck, service name networking |
-| CI | Three jobs with `needs`, secrets via env, real PG service in test job |
-| Commit history | Logical commits, not one giant "done" commit |
-| Time | Note how long it took |
+| Frontend | http://localhost:3000 |
+| API docs (Swagger) | http://localhost:8000/docs |
+| API | http://localhost:8000 |
+
+On first start, Docker runs `init.sql` automatically to create all tables.
+
+To stop and remove containers (database data is preserved in a volume):
+
+```bash
+docker compose down
+```
+
+To also wipe the database:
+
+```bash
+docker compose down -v
+```
 
 ---
 
-When you're done, paste your files one by one. Start with `init.sql`, then `models.py`, then work outward. Note your time. I'll review everything.
+## Running locally (without Docker)
+
+### Prerequisites
+
+- Python 3.12+
+- Node.js 20+
+- PostgreSQL running locally
+
+### Backend
+
+```bash
+# Create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS/Linux
+
+pip install -r requirements.txt
+```
+
+Create a `.env` file in the project root:
+
+```
+DATABASE_URL=postgresql://appuser:secret@localhost:5432/taskdb
+SECRET_KEY=any-long-random-string
+```
+
+Apply the schema to your local database:
+
+```bash
+psql -U appuser -d taskdb -f init.sql
+```
+
+Start the API:
+
+```bash
+uvicorn main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs at `http://localhost:3000` and expects the API at `http://localhost:8000`.
+
+---
+
+## Running tests
+
+Tests use SQLite in-memory via FastAPI's `dependency_overrides` — no PostgreSQL needed.
+
+```bash
+pytest
+```
+
+### Test coverage
+
+| # | Test |
+|---|---|
+| 1 | Register a user → 201, password not in response |
+| 2 | Login → returns a bearer token |
+| 3 | Create a team → 201, creator is in the member list |
+| 4 | Add a member as a non-member → 403 |
+| 5 | Create a task as a non-member → 403 |
+| 6 | Assign a task to a non-member → 400 |
+| 7 | Update a task as neither creator nor assignee → 403 |
+| 8 | Filter tasks by status → only matching tasks returned |
+
+---
+
+## API endpoints
+
+### Auth
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/auth/register` | — | Register. Returns user (no password). |
+| `POST` | `/auth/login` | — | Login. Returns JWT token. |
+| `GET` | `/auth/me` | ✓ | Returns the current user's profile. |
+
+### Teams
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/teams` | ✓ | List all teams the current user belongs to. |
+| `POST` | `/teams` | ✓ | Create a team. Creator is auto-added as first member. |
+| `GET` | `/teams/{team_id}` | ✓ member | Get team details and member list. |
+| `POST` | `/teams/{team_id}/members` | ✓ member | Add a user to the team. |
+
+### Tasks
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/teams/{team_id}/tasks` | ✓ member | Create a task. |
+| `GET` | `/teams/{team_id}/tasks` | ✓ member | List tasks. Supports `?status=` and `?assignee_id=` filters. |
+| `PATCH` | `/tasks/{task_id}` | ✓ creator/assignee | Partially update a task. |
+| `DELETE` | `/tasks/{task_id}` | ✓ creator | Delete a task. |
+
+---
+
+## Key design decisions
+
+**Services layer** — all business logic lives in `services/`. Route functions only parse the request, call a service, and return the result. This makes logic testable without spinning up an HTTP server.
+
+**Dependency chain** — `get_db` → `get_current_user` → `get_team_member`. Each layer builds on the previous. FastAPI resolves the full chain before calling a route, and caches the DB session so only one connection is opened per request.
+
+**Schema vs ORM model** — Pydantic schemas control what crosses the HTTP boundary. The `password` field exists on the SQLAlchemy model but not on `UserResponse`, so FastAPI never returns it, even if the ORM object has it.
+
+**ON DELETE behaviour** — each foreign key has a deliberate strategy: `CASCADE` where the child row is meaningless without the parent, `RESTRICT` where deletion must be an explicit decision, `SET NULL` where the row remains valid without the reference (e.g. a task without an assignee).
+
+**NEXT_PUBLIC_ env vars** — Next.js bakes `NEXT_PUBLIC_` variables into the JavaScript bundle at build time. The browser downloads this bundle; it cannot read Docker container environment variables. So the API URL is passed as a Docker build argument, not a runtime env var.

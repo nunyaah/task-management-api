@@ -13,11 +13,9 @@ This file is just the wiring.
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-# Load variables from .env into the process environment.
-# Must happen before any other import that reads os.getenv() — so it goes first.
-# In Docker Compose, environment variables are already injected by the runtime,
-# so load_dotenv() finds nothing new and is harmless there.
+# load_dotenv must run before any import that reads os.getenv()
 load_dotenv()
 
 from routers import auth, tasks, teams
@@ -28,8 +26,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Register each router. FastAPI attaches the router's routes to the app.
-# The prefix defined in each router (e.g. "/auth", "/teams") is applied here.
+# CORS: allow the Next.js dev server to call this API from the browser.
+# Without this, the browser blocks every request with "CORS policy" error.
+# In production, replace localhost:3000 with your real frontend domain.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(auth.router)
 app.include_router(teams.router)
 app.include_router(tasks.router)

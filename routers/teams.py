@@ -2,6 +2,8 @@
 Teams router — HTTP layer for team and membership endpoints.
 """
 
+from typing import List
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -12,6 +14,15 @@ from models import User
 from schemas import MemberAdd, TeamCreate, TeamMemberResponse, TeamResponse
 
 router = APIRouter(prefix="/teams", tags=["teams"])
+
+
+@router.get("", response_model=List[TeamResponse])
+def list_teams(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List all teams the current user belongs to."""
+    return teams_service.get_user_teams(db, current_user.id)
 
 
 @router.post("", response_model=TeamResponse, status_code=201)

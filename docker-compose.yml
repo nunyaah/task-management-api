@@ -28,15 +28,25 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      # .env is NOT committed to git. It contains the real secrets.
-      # Docker Compose loads it and injects each line as an environment variable.
       - .env
     depends_on:
       db:
-        # 'service_healthy' waits for the healthcheck above to pass before
-        # starting the API. Without this, the API starts while PostgreSQL is
-        # still initialising and crashes immediately on the first DB query.
         condition: service_healthy
+
+  # ── Next.js frontend ───────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend      # Dockerfile lives inside the frontend/ directory
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_ vars are compiled into the JS bundle, not read at runtime.
+        # The browser calls the API at localhost:8000 — that's the host-mapped port,
+        # accessible from the browser even though the frontend runs in Docker.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api   # Start after the API container (no healthcheck needed — browser calls API directly)
 
 # Named volumes must be declared here so Docker Compose manages their lifecycle.
 volumes:

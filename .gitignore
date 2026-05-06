@@ -1,6 +1,4 @@
-knowledge/
-
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
@@ -11,20 +9,26 @@ dist/
 build/
 .coverage
 
-# Environment — NEVER commit secrets
+# ── Environment — NEVER commit secrets ───────────────────────────────────────
 .env
+frontend/.env.local
 
-# Virtual environments
+# ── Virtual environments ──────────────────────────────────────────────────────
 venv/
 .venv/
 env/
 
-# SQLite test database (created by tests, not needed in git)
-test.db
-dev.db
+# ── SQLite test/dev databases ─────────────────────────────────────────────────
+*.db
 
-# IDE
+# ── Node / Next.js ────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 
+# ── Misc ──────────────────────────────────────────────────────────────────────
+knowledge/
 logs.md
