@@ -11,13 +11,10 @@ Separate from SQLAlchemy models on purpose:
 ORM objects (like a SQLAlchemy User row), not just from plain dicts.
 """
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr
-
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 

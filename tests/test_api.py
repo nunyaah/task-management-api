@@ -186,10 +186,10 @@ def test_add_member_as_non_member_returns_403():
     Test 4: A user who is not a team member cannot add members to that team.
     Expecting 403 Forbidden.
     """
-    alice = register("Alice", "alice@example.com")
+    register("Alice", "alice@example.com")
     alice_token = login("alice@example.com")
 
-    bob = register("Bob", "bob@example.com")
+    register("Bob", "bob@example.com")
     bob_token = login("bob@example.com")
 
     # Alice creates a team (Bob is NOT a member)
@@ -248,7 +248,7 @@ def test_update_task_as_unrelated_user_returns_403():
     Setup: Alice and Bob are both team members. Alice creates a task (not assigned to Bob).
     Bob tries to update it — he should be rejected.
     """
-    alice = register("Alice", "alice@example.com")
+    register("Alice", "alice@example.com")
     alice_token = login("alice@example.com")
 
     bob = register("Bob", "bob@example.com")

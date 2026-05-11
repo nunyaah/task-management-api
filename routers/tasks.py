@@ -11,7 +11,7 @@ path in each decorator instead.
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 import services.tasks as tasks_service

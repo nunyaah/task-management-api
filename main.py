@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # load_dotenv must run before any import that reads os.getenv()
 load_dotenv()
 
-from routers import auth, tasks, teams
+from routers import auth, tasks, teams  # noqa: E402
 
 app = FastAPI(
     title="Task Management API",
